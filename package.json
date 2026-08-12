@@ -1,0 +1,26 @@
+{
+  "name": "ztools-mise-manager",
+  "version": "1.0.0",
+  "main": "preload.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && cd dist && npm install --omit=dev",
+    "preview": "vite preview"
+  },
+  "keywords": ["ztools", "mise", "plugin"],
+  "author": "wangtao",
+  "license": "ISC",
+  "description": "Mise 控制台 - 可视化 mise 工具版本管理",
+  "dependencies": {
+    "iconv-lite": "^0.7.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}
