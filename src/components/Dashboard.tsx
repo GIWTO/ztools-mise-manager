@@ -1,4 +1,10 @@
 import { useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { FolderOpen, Wrench } from "lucide-react";
+import { toolIcon } from "@/lib/toolIcons";
 import type { InstalledTool, OutdatedItem } from "../types";
 
 interface Props {
@@ -6,43 +12,6 @@ interface Props {
   outdatedMap: Map<string, OutdatedItem>;
   loading: boolean;
   onOpenTool: (tool: string) => void;
-}
-
-const TOOL_ICONS: Record<string, string> = {
-  node: "⬢",
-  python: "🐍",
-  java: "☕",
-  ruby: "💎",
-  go: "🐹",
-  rust: "🦀",
-  dotnet: ".NET",
-  maven: "M",
-  gradle: "G",
-  pnpm: "pnpm",
-  npm: "npm",
-  bun: "🥟",
-  deno: "🦕",
-  yarn: "yarn",
-  terraform: "T",
-  kubernetes: "☸",
-  docker: "🐳",
-  php: "🐘",
-  lua: "🌙",
-  kotlin: "K",
-  swift: "🕊",
-  elixir: "💧",
-  erlang: "E",
-  zig: "⚡",
-  crystal: "💎",
-  ocaml: "🐫",
-  haskell: "λ",
-  clojure: "🍄",
-  julia: "julia",
-  "1password": "🔐",
-};
-
-function iconOf(name: string): string {
-  return TOOL_ICONS[name] || name.slice(0, 2).toUpperCase();
 }
 
 export default function Dashboard({ tools, outdatedMap, loading, onOpenTool }: Props) {
@@ -56,85 +25,92 @@ export default function Dashboard({ tools, outdatedMap, loading, onOpenTool }: P
     );
   }, [tools, query]);
 
+  const totalVersions = tools.reduce((s, t) => s + t.installCount, 0);
+
   return (
     <div>
-      <div className="toolbar">
-        <input
-          className="search-input"
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          className="max-w-md"
           placeholder="搜索工具或版本… (如 node, 22)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <span className="status-chip">
-          {loading ? "加载中…" : `共 ${tools.length} 个工具 / ${tools.reduce((s, t) => s + t.installCount, 0)} 个版本`}
+          {loading ? "加载中…" : `共 ${tools.length} 个工具 / ${totalVersions} 个版本`}
         </span>
       </div>
 
       {loading && tools.length === 0 ? (
-        <div className="loading-hint">🔄 正在读取 mise 环境…</div>
+        <div className="py-10 text-center text-sm text-muted-foreground">🔄 正在读取 mise 环境…</div>
       ) : filtered.length === 0 ? (
-        <div className="empty-hint">没有匹配的工具</div>
+        <div className="py-10 text-center text-sm text-muted-foreground">没有匹配的工具</div>
       ) : (
-        <div className="grid">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((tool) => {
             const od = outdatedMap.get(tool.name);
+            const active = tool.versions.find((v) => v.active);
+            const requested = tool.versions.find((v) => v.requested && v.requested !== v.version);
+            const Icon = toolIcon(tool.name);
             return (
-              <div key={tool.name} className="tool-card" onClick={() => onOpenTool(tool.name)}>
-                <div className="tool-head">
-                  <div className="tool-icon" style={{ fontSize: tool.name === "dotnet" ? 12 : 20 }}>
-                    {iconOf(tool.name)}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="tool-name">{tool.name}</div>
-                    <div className="tool-ver">
-                      {tool.activeVersion || "未激活"} · {tool.installCount} 版本
+              <Card key={tool.name} className="tool-card-body">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="tool-icon">
+                      <Icon strokeWidth={1.8} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-bold">{tool.name}</div>
+                      <div className="mono truncate text-xs text-muted-foreground">
+                        {tool.activeVersion || "未激活"} · {tool.installCount} 版本
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="tool-meta">
-                  {tool.activeVersion ? (
-                    <span className="badge active">● 激活</span>
-                  ) : (
-                    <span className="badge">未激活</span>
-                  )}
-                  {od && (
-                    <span className="badge outdated" title={`${od.current} → ${od.latest}`}>
-                      ⬆ 可升级 {od.latest}
-                    </span>
-                  )}
-                  {tool.versions.find((v) => v.requested && v.requested !== v.version) && (
-                    <span className="badge" title="配置文件中的请求版本">
-                      配置: {tool.versions.find((v) => v.requested)?.requested}
-                    </span>
-                  )}
-                </div>
-                <div className="tool-actions">
-                  <button
-                    className="btn sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenTool(tool.name);
-                    }}
-                  >
-                    管理
-                  </button>
-                  {tool.activeVersion &&
-                    (() => {
-                      const active = tool.versions.find((v) => v.active);
-                      return active?.installPath ? (
-                        <button
-                          className="btn sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.miseManager.openInstallDir(tool.name, active.version);
-                          }}
-                        >
-                          📂 目录
-                        </button>
-                      ) : null;
-                    })()}
-                </div>
-              </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {tool.activeVersion ? (
+                      <Badge variant="default">● 激活</Badge>
+                    ) : (
+                      <Badge variant="secondary">未激活</Badge>
+                    )}
+                    {od && (
+                      <Badge variant="warn" title={`${od.current} → ${od.latest}`}>
+                        ⬆ {od.latest}
+                      </Badge>
+                    )}
+                    {requested && (
+                      <Badge variant="outline" title="配置文件中的请求版本">
+                        配置: {requested.requested}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenTool(tool.name);
+                      }}
+                    >
+                      <Wrench /> 管理
+                    </Button>
+                    {active?.installPath && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.miseManager.openInstallDir(tool.name, active.version);
+                        }}
+                      >
+                        <FolderOpen /> 目录
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>

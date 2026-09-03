@@ -9,7 +9,28 @@ const fs = require("fs");
 const path = require("path");
 
 const isWin = process.platform === "win32";
-const PROJECTS_FILE = path.join(__dirname, "projects.json");
+
+// 持久化目录：插件以 .asar 包运行时，__dirname 指向只读归档，写入会静默失败。
+// 因此收藏项目数据改存到 ZTools 用户数据目录下（可写、可跨重启持久）。
+let _projectsFile = null;
+function getProjectsFile() {
+  if (_projectsFile) return _projectsFile;
+  let base = null;
+  try {
+    if (window.ztools && typeof window.ztools.getPath === "function") {
+      const u = window.ztools.getPath("userData");
+      if (u && typeof u === "string" && u.trim()) base = u.trim();
+    }
+  } catch (e) { /* 忽略 */ }
+  if (!base) {
+    // 兜底：使用系统 APPDATA/ZTools（与 ZTools userData 一致）
+    base = path.join(process.env.APPDATA || process.env.HOME || ".", "ZTools");
+  }
+  const dataDir = path.join(base, "ztools-mise-manager");
+  try { fs.mkdirSync(dataDir, { recursive: true }); } catch (e) { /* 忽略 */ }
+  _projectsFile = path.join(dataDir, "projects.json");
+  return _projectsFile;
+}
 
 // 辅助函数：解码输出（mise 为 Rust 程序默认 UTF-8，Windows 下兜底 GBK）
 // Node v22 exec 回调默认返回 string，需兼容 Buffer 与 string 两种输入
@@ -51,11 +72,21 @@ function runLongTask(cmd, { onLog, onProgress } = {}) {
     const env = { ...process.env, NO_COLOR: "1", CLICOLOR: "0", MISE_TERM_COLOR: "never" };
     const child = spawn(cmd, [], { shell: true, env });
     let stderrBuf = "";
+    let autoConfirmed = false;
 
     const handleData = (data) => {
       const text = decodeOutput(data);
       stderrBuf += text;
       if (onLog) onLog(text);
+
+      // 自动应答交互式确认提示（如 mise self-update 的 "Do you want to continue? [Y/n]"）
+      // 这类提示在无终端环境下无法人工输入，检测到后自动向 stdin 写入 y
+      if (!autoConfirmed && /continue\s*\?|\[Y\/n\]|\[y\/N\]|\[y\/n\]/i.test(text)) {
+        autoConfirmed = true;
+        try {
+          if (child.stdin && child.stdin.writable) child.stdin.write("y\n");
+        } catch (e) { /* ignore */ }
+      }
 
       const matches = text.match(/\b(\d{1,3})\s*%/g);
       if (matches && onProgress) {
@@ -85,8 +116,9 @@ function runLongTask(cmd, { onLog, onProgress } = {}) {
 }
 
 function loadProjects() {
+  const file = getProjectsFile();
   try {
-    if (fs.existsSync(PROJECTS_FILE)) return JSON.parse(fs.readFileSync(PROJECTS_FILE, "utf-8"));
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, "utf-8"));
   } catch (e) {
     console.error("Failed to load projects.json", e);
   }
@@ -94,8 +126,9 @@ function loadProjects() {
 }
 
 function saveProjects(list) {
+  const file = getProjectsFile();
   try {
-    fs.writeFileSync(PROJECTS_FILE, JSON.stringify(list, null, 2), "utf-8");
+    fs.writeFileSync(file, JSON.stringify(list, null, 2), "utf-8");
   } catch (e) {
     console.error("Failed to save projects.json", e);
   }
@@ -152,13 +185,17 @@ function parseConfigFiles(text) {
 }
 
 window.miseManager = {
+  // 当前运行平台（win32 / darwin / linux），供前端做平台适配
+  platform: process.platform,
+
   // --- 系统信息 ---
   getSystemInfo: async () => {
     const ver = await runCommand("mise --version");
     if (!ver.ok) return { missing: true, version: "", configPath: "", installDir: "" };
     let configPath = "";
     try {
-      configPath = execSync("mise config 2>nul", { shell: true, encoding: "utf-8" })
+      const nullDev = isWin ? "2>nul" : "2>/dev/null";
+      configPath = execSync(`mise config ${nullDev}`, { shell: true, encoding: "utf-8" })
         .split("\n").map((l) => l.trim()).filter(Boolean)[0] || "";
       configPath = configPath.split(/\s{2,}/)[0] || configPath;
     } catch (e) { /* ignore */ }
@@ -245,6 +282,12 @@ window.miseManager = {
     return runLongTask(cmd, { onLog, onProgress });
   },
 
+  // --- 更新 mise 本体 (mise self-update) ---
+  // --yes: 无终端环境下无法交互确认，直接跳过 "Do you want to continue? [Y/n]" 提示
+  selfUpdate: ({ onLog, onProgress } = {}) => {
+    return runLongTask("mise self-update --yes", { onLog, onProgress });
+  },
+
   // --- 工具市场 ---
   getRegistry: async () => {
     const res = await runJson("mise registry --json");
@@ -282,13 +325,34 @@ window.miseManager = {
   },
 
   // --- 项目管理 ---
+  // 兼容 ztools.showOpenDialog 的多种返回形态：
+  //   1) string[]（路径数组）  2) 单个 string（路径）  3) Electron 风格 { canceled, filePaths: string[] }
   selectFolder: async () => {
-    if (window.ztools && window.ztools.showOpenDialog) {
-      const res = window.ztools.showOpenDialog({ properties: ["openDirectory"] });
-      const paths = res instanceof Promise ? await res : res;
-      return paths && paths.length > 0 ? paths[0] : null;
+    if (!(window.ztools && window.ztools.showOpenDialog)) return null;
+    const res = await window.ztools.showOpenDialog({ properties: ["openDirectory"] });
+    let path = null;
+    if (typeof res === "string") {
+      path = res;
+    } else if (Array.isArray(res)) {
+      path = res[0] || null;
+    } else if (res && typeof res === "object") {
+      // 优先取数组字段，其次取单个字符串字段
+      for (const key of ["filePaths", "paths", "selectedPaths"]) {
+        if (Array.isArray(res[key])) {
+          path = res[key][0] || null;
+          break;
+        }
+      }
+      if (path == null) {
+        for (const key of ["path", "filePath", "selectedPath"]) {
+          if (typeof res[key] === "string") {
+            path = res[key];
+            break;
+          }
+        }
+      }
     }
-    return null;
+    return path && typeof path === "string" && path.trim() ? path.trim() : null;
   },
 
   projects: {
@@ -317,7 +381,13 @@ window.miseManager = {
       if (window.ztools && window.ztools.shellOpenPath) {
         return window.ztools.shellOpenPath(dir);
       }
-      exec(`start "" "${dir}"`, { shell: true });
+      // 平台对应的资源管理器打开方式
+      const opener = isWin
+        ? `start "" "${dir}"`
+        : process.platform === "darwin"
+          ? `open "${dir}"`
+          : `xdg-open "${dir}"`;
+      exec(opener, { shell: true });
       return true;
     }
     return false;

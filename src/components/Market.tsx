@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Download, RefreshCw } from "lucide-react";
+import { toolIcon } from "@/lib/toolIcons";
 import type { RegistryTool, TaskProgress } from "../types";
 
 interface Props {
@@ -65,62 +71,82 @@ export default function Market({ onChanged }: Props) {
 
   return (
     <div>
-      <div className="toolbar">
-        <input
-          className="search-input"
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          className="max-w-md"
           placeholder="搜索工具市场… (如 node, python, ripgrep)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button className="btn" onClick={load} disabled={loading}>
-          🔄 刷新
-        </button>
+        <Button variant="outline" onClick={load} disabled={loading}>
+          <RefreshCw className="h-3.5 w-3.5" /> 刷新
+        </Button>
         <span className="status-chip">{loading ? "加载中…" : `${filtered.length} / ${registry.length} 个工具`}</span>
       </div>
 
       {loading ? (
-        <div className="loading-hint">🔄 正在加载工具市场…</div>
+        <div className="py-10 text-center text-sm text-muted-foreground">🔄 正在加载工具市场…</div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" }}>
-          <table className="market-table">
+        <Card className="overflow-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr>
-                <th style={{ width: 140 }}>名称</th>
-                <th>描述</th>
-                <th style={{ width: 200 }}>后端</th>
-                <th style={{ width: 90 }}>操作</th>
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="sticky top-0 bg-card px-4 py-2.5 font-semibold">名称</th>
+                <th className="sticky top-0 bg-card px-4 py-2.5 font-semibold">描述</th>
+                <th className="sticky top-0 hidden bg-card px-4 py-2.5 font-semibold md:table-cell">后端</th>
+                <th className="sticky top-0 bg-card px-4 py-2.5 text-right font-semibold">操作</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
-                <tr key={t.name}>
-                  <td className="mt-name">{t.name}</td>
-                  <td className="mt-desc">{t.description || "—"}</td>
-                  <td className="mt-backend">{t.backends[0] || "—"}</td>
-                  <td>
-                    <button className="btn sm primary" disabled={!!busyName} onClick={() => runInstall(t.name)}>
-                      ⬇ 安装
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((t) => {
+                const Icon = toolIcon(t.name);
+                return (
+                  <tr key={t.name} className="border-b last:border-b-0 hover:bg-accent/50">
+                    <td className="px-4 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="tool-icon-sm">
+                          <Icon strokeWidth={2} />
+                        </span>
+                        <span className="mono font-semibold">{t.name}</span>
+                      </span>
+                    </td>
+                    <td className="max-w-[380px] px-4 py-2 text-xs text-muted-foreground">
+                      {t.description || "—"}
+                    </td>
+                    <td className="mono hidden px-4 py-2 text-[11px] text-muted-foreground md:table-cell">
+                      {t.backends[0] || "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" disabled={!!busyName} onClick={() => runInstall(t.name)}>
+                        <Download className="h-3.5 w-3.5" /> 安装
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="empty-hint">无匹配工具</div>}
-        </div>
+          {filtered.length === 0 && (
+            <div className="py-10 text-center text-sm text-muted-foreground">无匹配工具</div>
+          )}
+        </Card>
       )}
 
-      {task && (
-        <div className="progress-wrap fade-in">
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${task.percent}%` }} />
-          </div>
-          <div className="progress-text">
-            <span>{task.running ? "⏳ 正在安装" : task.error ? "❌ 失败" : "✅ 完成"}: {task.tool} (latest)</span>
-            <span>{task.percent}%</span>
+          {task && (
+            <div className="mt-4 fade-in rounded-md border p-3">
+              <Progress value={task.percent} />
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className={task.error ? "text-destructive" : "text-muted-foreground"}>
+                  {task.running ? "⏳ 正在安装" : task.error ? "❌ 失败" : "✅ 完成"}: {task.tool} (latest)
+                </span>
+            <span className="mono text-muted-foreground">{task.percent}%</span>
           </div>
           {task.logs.length > 0 && <div className="log-box">{task.logs.join("")}</div>}
-          {task.error && <div className="error-banner" style={{ marginTop: 8 }}>{task.error}</div>}
+          {task.error && (
+            <div className="mt-2 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {task.error}
+            </div>
+          )}
         </div>
       )}
     </div>

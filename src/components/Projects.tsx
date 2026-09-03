@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Save, X } from "lucide-react";
 import type { Project } from "../types";
 
 interface Props {
@@ -36,7 +41,6 @@ export default function Projects({ onChanged }: Props) {
     setSelected(projPath);
     setSaved(false);
     setError("");
-    // 读取项目目录下候选配置文件
     const candidates = ["mise.toml", ".mise.toml", ".tool-versions"];
     for (const c of candidates) {
       const file = `${projPath.replace(/[\\/]+$/, "")}/${c}`;
@@ -102,101 +106,111 @@ export default function Projects({ onChanged }: Props) {
   };
 
   return (
-    <div className="split" style={{ height: "auto", minHeight: 0, flexDirection: "column" }}>
+    <div className="flex flex-col gap-4">
       {/* 全局配置 */}
-      <div className="card" style={{ flexShrink: 0 }}>
-        <div className="toolbar" style={{ marginBottom: 8 }}>
-          <h3 style={{ fontSize: 15 }}>🌐 全局配置（mise settings）</h3>
+      <Card className="p-4">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <h3 className="text-[15px] font-semibold">🌐 全局配置（mise settings）</h3>
           {configFiles.length > 0 && (
-            <span className="status-chip" title="配置文件列表">
+            <span className="mono min-w-0 max-w-full truncate rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground" title={configFiles[0].path}>
               {configFiles[0].path}
             </span>
           )}
         </div>
-        <pre className="detail-pre" style={{ maxHeight: 140 }}>
-          {globalConfig}
-        </pre>
-      </div>
+        <pre className="detail-pre max-h-48 overflow-auto">{globalConfig}</pre>
+      </Card>
 
-      <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "flex-start" }}>
+      <div className="flex items-start gap-4">
         {/* 项目列表 */}
-        <div className="split-left" style={{ height: "auto", maxHeight: 480 }}>
-          <div style={{ padding: 10 }}>
-            <button className="btn primary" style={{ width: "100%" }} onClick={addProject}>
-              ＋ 添加项目目录
-            </button>
+        <Card className="flex w-60 shrink-0 flex-col overflow-hidden">
+          <div className="p-3">
+            <Button className="w-full" onClick={addProject}>
+              <Plus className="h-4 w-4" /> 添加项目目录
+            </Button>
           </div>
-          {projects.map((p) => (
-            <div
-              key={p.path}
-              className={`tool-list-item ${selected === p.path ? "active" : ""}`}
-              onClick={() => loadConfig(p.path)}
-            >
-              <div style={{ minWidth: 0 }}>
-                <div className="tl-name">{p.name}</div>
-                <div className="tl-ver" style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>
-                  {p.path}
-                </div>
-              </div>
-              <button
-                className="btn sm danger"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeProject(p.path);
-                }}
+          <div className="max-h-[420px] overflow-y-auto">
+            {projects.map((p) => (
+              <div
+                key={p.path}
+                onClick={() => loadConfig(p.path)}
+                className={`flex w-full cursor-pointer items-center justify-between gap-2 border-b px-4 py-2.5 text-left text-sm transition-colors last:border-b-0 hover:bg-accent/60 ${
+                  selected === p.path ? "border-l-2 border-l-primary bg-accent text-accent-foreground" : ""
+                }`}
               >
-                ✕
-              </button>
-            </div>
-          ))}
-          {projects.length === 0 && <div className="empty-hint">尚无收藏项目</div>}
-        </div>
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{p.name}</div>
+                  <div className="mono truncate text-[11px] text-muted-foreground">{p.path}</div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeProject(p.path);
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            {projects.length === 0 && (
+              <div className="py-8 text-center text-xs text-muted-foreground">尚无收藏项目</div>
+            )}
+          </div>
+        </Card>
 
-        {/* 项目配置编辑器 */}
-        <div className="split-right" style={{ height: "auto", minHeight: 0, maxHeight: 560 }}>
+        {/* 配置编辑器 */}
+        <Card className="min-w-0 flex-1 p-4">
           {!selected ? (
-            <div className="empty-hint">← 选择或添加一个项目，管理其 .mise.toml 配置</div>
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              ← 选择或添加一个项目，管理其 .mise.toml 配置
+            </div>
           ) : (
             <div className="fade-in">
-              <div className="toolbar" style={{ marginBottom: 10 }}>
-                <h3 style={{ fontSize: 15, fontFamily: "Consolas, monospace" }}>{configFile}</h3>
-                <div style={{ marginLeft: "auto" }}>
-                  {saved && <span className="badge active" style={{ marginRight: 8 }}>✓ 已保存</span>}
-                  <button className="btn sm primary" onClick={saveConfig}>💾 保存</button>
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <h3 className="mono min-w-0 truncate text-sm font-semibold">{configFile}</h3>
+                <div className="ml-auto flex items-center gap-2">
+                  {saved && <span className="text-xs font-medium text-primary">✓ 已保存</span>}
+                  <Button size="sm" onClick={saveConfig}>
+                    <Save className="h-3.5 w-3.5" /> 保存
+                  </Button>
                 </div>
               </div>
 
-              {error && <div className="error-banner">{error}</div>}
+              {error && (
+                <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {error}
+                </div>
+              )}
 
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                <input
-                  className="search-input"
-                  style={{ maxWidth: 160, minWidth: 100 }}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Input
+                  className="w-36"
                   placeholder="工具名 (node)"
                   value={newTool}
                   onChange={(e) => setNewTool(e.target.value)}
                 />
-                <input
-                  className="search-input"
-                  style={{ maxWidth: 140, minWidth: 100 }}
-                  placeholder="版本 (22 或留空=latest)"
+                <Input
+                  className="w-32"
+                  placeholder="版本 (22 / 留空=latest)"
                   value={newVer}
                   onChange={(e) => setNewVer(e.target.value)}
                 />
-                <button className="btn" disabled={busy || !newTool.trim()} onClick={addToolToProject}>
-                  ＋ 为项目添加工具
-                </button>
+                <Button variant="outline" disabled={busy || !newTool.trim()} onClick={addToolToProject}>
+                  <Plus className="h-3.5 w-3.5" /> 为项目添加工具
+                </Button>
               </div>
 
-              <textarea
-                className="config-textarea"
+              <Textarea
+                className="min-h-[220px] font-mono text-[13px]"
                 value={configText}
                 onChange={(e) => setConfigText(e.target.value)}
                 spellCheck={false}
               />
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
   "name": "ztools-mise-manager",
   "title": "Mise 控制台",
   "description": "🚀 可视化管理 mise 开发工具版本。支持已装工具总览、安装/卸载/切换版本、工具市场浏览、项目 .mise.toml 配置管理。",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "main": "index.html",
   "author": "wangtao",
   "logo": "logo.png",
@@ -10,7 +10,7 @@
   "features": [
     {
       "code": "mise-manager",
-      "explain": "可视化管理 mise 工具与版本（需本机安装 mise，推荐 winget install jdx.mise）",
+      "explain": "可视化管理 mise 工具与版本（需本机安装 mise，Windows: winget install jdx.mise，macOS: brew install mise）",
       "cmds": [
         "mise",
         "mise管理",

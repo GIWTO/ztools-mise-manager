@@ -10,6 +10,7 @@ import type {
 } from "./types";
 
 interface MiseManagerApi {
+  platform: string;
   getSystemInfo(): Promise<SystemInfo>;
   getInstalledTools(): Promise<{ ok: boolean; error?: string; tools: InstalledTool[] }>;
   getToolInfo(tool: string): Promise<{ ok: boolean; text: string }>;
@@ -24,6 +25,7 @@ interface MiseManagerApi {
   setProject(tool: string, version: string, projectPath?: string): Promise<string>;
   getOutdated(): Promise<{ ok: boolean; list: OutdatedItem[]; raw: string }>;
   upgrade(tool?: string, cb?: { onLog?: (t: string) => void; onProgress?: (p: number) => void }): Promise<string>;
+  selfUpdate(cb?: { onLog?: (t: string) => void; onProgress?: (p: number) => void }): Promise<string>;
   getRegistry(): Promise<{ ok: boolean; error?: string; tools: RegistryTool[] }>;
   getConfigFiles(): Promise<{ ok: boolean; files: ConfigFile[]; raw: string }>;
   readConfigFile(filePath: string): { ok: boolean; content?: string; error?: string };
